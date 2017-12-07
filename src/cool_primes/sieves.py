@@ -92,7 +92,7 @@ def croft():
     primeroots = frozenset((1, 7, 11, 13, 17, 19, 23, 29))
     selectors = (1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0)
     for q in compress(itertools.islice(itertools.count(7), 0, None, 2), itertools.cycle(selectors)):
-        if q in rootS:
+        if q in roots:
             p = roots[q]
             del roots[q]
             x = q + 2 * p
