@@ -5,125 +5,95 @@ Copyright 2017 kkmonlee
 """
 
 """
-Generate prime numbers using a sieve.
+Generate prime numbers using various sieve algorithms.
 """
 
 import itertools
-from cool_primes import compress, next, range
+from typing import Iterator, List
 
-__all__ = ['best_sieve', 'cookbook', 'croft', 'erat', 'sieve', 'wheel']
+__all__ = ['best_sieve', 'cookbook', 'croft', 'erat', 'sieve', 'wheel_210']
 
-def erat(n):
-    """
-    A fixed-size version of Sieve of Eratosthenes.
-
-    Returns a list of primes up to n inclusive.
-    """
+def erat(n: int) -> List[int]:
+    """A fixed-size Sieve of Eratosthenes."""
     if n < 2:
         return []
-    arr = list(range(n + 1))
-    arr[0] = arr[1] = None
-    i = 2
-    while i * i <= n:
-        # Cross out all multiples of i starting from i**2
-        for p in range(i * i, n + 1, i):
-            arr[p] = None
-        i += 1
-        while i <= n and arr[i] is None:
-            i += 1
+    is_prime = [True] * (n + 1)
+    is_prime[0] = is_prime[1] = False
+    for i in range(2, int(n**0.5) + 1):
+        if is_prime[i]:
+            for multiple in range(i * i, n + 1, i):
+                is_prime[multiple] = False
+    return [i for i, prime in enumerate(is_prime) if prime]
 
-    return list(filter(None, arr))
-
-def sieve():
-    """
-    Yields prime integers using Sieve of Eratosthenes.
-
-    Generates primes lazily and recursively rather than the traditional version.
-    """
-    innersieve = sieve()
-    prevsq = 1
-    table = {}
+def sieve() -> Iterator[int]:
+    """Yields prime integers using a lazy Sieve of Eratosthenes."""
+    composites = {}
     i = 2
     while True:
-        if i in table:
-            prime = table[i]
-            del table[i]
-            nxt = i + prime
-            while nxt in table:
-                nxt += prime
-            table[nxt] = prime
-        else:
+        if i not in composites:
             yield i
-            if i > prevsq:
-                j = next(innersieve)
-                prevsq = j ** 2
-                table[prevsq] = j
+            composites[i * i] = i
+        else:
+            prime = composites.pop(i)
+            next_composite = i + prime
+            while next_composite in composites:
+                next_composite += prime
+            composites[next_composite] = prime
         i += 1
 
-def cookbook();
-    """
-    Yields prime integers lazily using Sieve of Eratosthenes.
-
-    Based on Python Cookbook, 2nd Edition, recipse 18.10, variant erat2.
-    """
-    table = {}
+def cookbook() -> Iterator[int]:
+    """Yields prime integers lazily, based on a Python Cookbook recipe."""
     yield 2
-    
-    for q in itertools.islice(itertools.count(3), 0, None, 2):
-        if q in table:
-            p = table[q]; del table[q]
-            x = p + q
-            while x in table or not (x & 1):
-                x += p
-            table[x] = p
-        else:
-            table[q * q] = q
+    composites = {}
+    for q in itertools.count(3, 2):
+        if q not in composites:
             yield q
+            composites[q * q] = q
+        else:
+            prime = composites.pop(q)
+            next_composite = q + 2 * prime
+            while next_composite in composites:
+                next_composite += 2 * prime
+            composites[next_composite] = prime
 
-def croft():
-    """
-    Yields prime integers using Croft Spiral sieve.
-
-    Variant of wheen factorisation modulo 30
-    """
+def croft() -> Iterator[int]:
+    """Yields prime integers using the Croft Spiral sieve (a wheel mod 30)."""
     for p in (2, 3, 5):
         yield p
-    roots = {9: 3, 25: 5}
-    primeroots = frozenset((1, 7, 11, 13, 17, 19, 23, 29))
-    selectors = (1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0)
-    for q in compress(itertools.islice(itertools.count(7), 0, None, 2), itertools.cycle(selectors)):
-        if q in roots:
-            p = roots[q]
-            del roots[q]
-            x = q + 2 * p
-            while x in roots or (x % 30) not in primeroots:
-                x += 2 * p
-            roots[x] = p
-        else:
-            roots[q * q] = q
+    composites = {}
+    wheel_increments = itertools.cycle([6, 4, 2, 4, 2, 4, 6, 2])
+    q = 7
+    while True:
+        if q not in composites:
             yield q
+            composites[q * q] = q
+        else:
+            prime = composites.pop(q)
+            next_composite = q + 2 * prime
+            while next_composite in composites:
+                next_composite += 2 * prime
+            composites[next_composite] = prime
+        q += next(wheel_increments)
 
-def wheel():
-    """
-    Generates prime number using wheel factorisation modulo 210
-    """
-    for i in range(2, 3, 5, 7, 11):
-        yield i
-    spokes = (2, 4, 2, 4, 6, 2, 6, 4, 2, 4, 6, 6, 2, 6, 4, 2, 6, 4, 6,
-        8, 4, 2, 4, 2, 4, 8, 6, 4, 6, 2, 4, 6, 2, 6, 6, 4, 2, 4, 6, 2,
-        6, 4, 2, 4, 2, 10, 2, 10)
-    assert len(spokes) == 48
-    found = [(11, 121)]
-    for incr in itertools.cycle(spokes):
-        i += incr
-        for p, p2 in found:
-            if p2 > i:
-                found.append((i, i * i))
-                yield i
-                break
-            elif i % p == 0:
-                break
-            else:
-                raise RuntimeError("Internal error: ran out of prime divisors")
+def wheel_210() -> Iterator[int]:
+    """Generates prime numbers using wheel factorization modulo 210."""
+    for p in (2, 3, 5, 7):
+        yield p
+    composites = {}
+    increments = (6, 4, 2, 4, 2, 4, 6, 2, 4, 6, 2, 6, 4, 2, 6, 4, 6, 8, 4, 2, 4, 2, 4, 8, 6, 4, 6, 2, 4, 6, 2, 6, 6, 4, 2, 4, 6, 2, 6, 4, 2, 4, 2, 10, 2, 10)
+    q = 11
+    # Create the wheel generator object once
+    wheel_gen = itertools.cycle(increments)
+    while True:
+        if q not in composites:
+            yield q
+            composites[q * q] = q
+        else:
+            prime = composites.pop(q)
+            next_composite = q + 2 * prime
+            while next_composite in composites:
+                next_composite += 2 * prime
+            composites[next_composite] = prime
+        q += next(wheel_gen)
 
-best_sieve = croft
+best_sieve = cookbook
