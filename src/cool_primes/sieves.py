@@ -82,7 +82,6 @@ def wheel_210() -> Iterator[int]:
     composites = {}
     increments = (6, 4, 2, 4, 2, 4, 6, 2, 4, 6, 2, 6, 4, 2, 6, 4, 6, 8, 4, 2, 4, 2, 4, 8, 6, 4, 6, 2, 4, 6, 2, 6, 6, 4, 2, 4, 6, 2, 6, 4, 2, 4, 2, 10, 2, 10)
     q = 11
-    # Create the wheel generator object once
     wheel_gen = itertools.cycle(increments)
     while True:
         if q not in composites:

@@ -73,8 +73,12 @@ def is_prime(n: int, k: int = 8, *, instrument=None) -> bool:
     """
     def _update_stat(flag):
         if instrument:
-            instrument.update(is_prime.__name__, n, flag) 
+            instrument.update(is_prime.__name__, n, flag)
 
+    if n < 2:
+        _update_stat(0) # 0 = Not prime
+        return False
+    
     if n in (2, 3):
         _update_stat(1) # 1 = Prime
         return True
@@ -99,8 +103,6 @@ def is_prime(n: int, k: int = 8, *, instrument=None) -> bool:
     elif n < 3_317_044_064_279_371:
         bases = [2, 3, 5, 7, 11, 13, 17, 19, 23]
     else:
-        # For larger numbers, we will perform a probabilistic test with k random bases.
-        # Draw k random bases from the range [2, n-2]
         bases = random.sample(range(2, n - 1), k)
 
     for a in bases:
@@ -108,7 +110,6 @@ def is_prime(n: int, k: int = 8, *, instrument=None) -> bool:
         if _is_composite_miller_rabin(n, a):
             _update_stat(0) # 0 = Not prime
             return False # Definitely composite
-    
-    _update_stat(1) # Prime
 
+    _update_stat(1) # 1 = Prime
     return True # Definitely (if in range) or probably prime

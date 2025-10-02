@@ -9,9 +9,6 @@ Utility functions
 """
 import itertools
 import math
-from operator import gt
-from functools import partial
-from collections import namedtuple
 from typing import Iterable, Iterator, Optional, TypeVar
 
 T = TypeVar('T')
@@ -22,7 +19,7 @@ def filter_between(
         end: Optional[T] = None
 ) -> Iterator[T]:
     """
-        Yield items from an iterator in the range [start, end).
+    Yield items from an iterator in the range [start, end).
 
     If start is provided, drops items until an item >= start is found.
     If end is provided, stops yielding when an item >= end is found.
