@@ -7,160 +7,98 @@ Copyright 2017 kkmonlee
 """
 Utility functions
 """
-
-from __future__ import division
-
 import itertools
-import operator
+import math
+from operator import gt
+from functools import partial
+from collections import namedtuple
+from typing import Iterable, Iterator, Optional, TypeVar
 
-try:
-    # Improve speed with partial, if available
-    from functools import partial
-except ImportError:
-    partial = None
+T = TypeVar('T')
 
-def filter_between(iterable, start=None, end=None):
+def filter_between(
+        iterable: Iterator[T],
+        start: Optional[T] = None,
+        end: Optional[T] = None
+) -> Iterator[T]:
     """
-    Yield items from iterable in the range(start, end).
+        Yield items from an iterator in the range [start, end).
 
-    Returns an iterator from the given iterable.
+    If start is provided, drops items until an item >= start is found.
+    If end is provided, stops yielding when an item >= end is found.
     """
+    isqrt = math.isqrt
+
     iterator = iter(iterable)
     if start is not None:
-        # Drop values strictly less than start
-        if partial is None:
-            drop = lambda p: p < start
-        else:
-            # Skip over any values where v < start but
-            # partial assigns operands from left so
-            # it has to be written as start > p
-            drop = partial(operator.gt, start)
-        iterator = itertools.dropwhile(drop, iterator)
+        iterator = itertools.dropwhile(lambda x: x < start, iterator)
     if end is not None:
-        # Take values strictly less than end
-        if partial is None:
-            take = lambda p: p < end
-        else:
-            # Halt at the first value where v >= end but
-            # partial assigns operabds from left so it
-            # has to be written as end > p
-            take = partial(operator.gt, end)
-        iterator = itertools.takewhile(take, iterator)
+        iterator = itertools.takewhile(lambda x: x < end, iterator)
     return iterator
 
-# Every integer between 0 and MAX_EXACT inclusive
-MAX_EXACT = 9007199254740991
-
-# Get number of bits needed to represent an int in binary
-try:
-    _bit_length = int.bit_length
-except AttributeError:
-    def _bit_length(n):
-        if n == 0:
-            return 0
-        elif n < 0:
-            n = -n
-        assert n >= 1
-        numbits = 0
-        # Accelerate function for larger values of n
-        while n > 2**64:
-            numbits += 64; n >>= 64
-        while n:
-            numbits += 1; n >>= 1
-        return numbits
-
-def isqrt(n):
-    """
-    Return the integer square root of n.
-    """
-    if n < 0:
-        raise ValueError("Square root undefined for negative numbers!")
-    elif n <= MAX_EXACT:
-        # Floating point
-        return int(n ** 0.5)
-    return _isqrt(n)
-
-def _isqrt(n):
-    if n == 0:
-        return 0
-    bits = _bit_length(n)
-    a, b = divmod(bits, 2)
-    x = 2 ** (a + b)
-    while True:
-        y = (x + n // x) // 2
-        if y >= x:
-            return x
-        x = y
-
-try:
-    from collections import namedtuple
-except ImportError:
-    # Raised if Python 2.4. We can use a regular typle.
-    def namedtuple(name, fields):
-        return tuple
-
-class MethodStats(object):
-    """
-    Statistics for is_probably_prime
-    """
-    def __init__(self, hits=0, low=None, high=None):
+class MethodStats:
+    """Statistics for is_probably_prime methods"""
+    def __init__(
+        self, 
+        hits: int = 0, 
+        low: Optional[int] = None, 
+        high: Optional[int] = None
+    ):
         self.hits = hits
         self.low = low
         self.high = high
-    
-    def __repr__(self):
-        template = "%s(hits=%d, low=%r, high=%r)"
+
+    def __repr__(self) -> str:
         name = type(self).__name__
-        return template % (name, self.hits, self.low, self.high)
-
-    def update(self, value):
+        return f"{name}(hits={self.hits}, low={self.low}, high={self.high})"
+    
+    def update(self, value: int):
         self.hits += 1
-        a, b = self.low, self.high
-        if a is None: a = value
-        else: a = min(a, value)
-        if b is None: b = value
-        else: b = max(b, value)
-        self.low, self.high = a, b
+        self.low = min(self.low, value) if self.low is not None else value
+        self.high = max(self.high, value) if self.high is not None else value
 
-class Instrument(object):
-    """
-    Instrumentation for is_probable_prime
-    """
-    def __init__(self, owner, methods):
+class Instrument:
+    """Instrumentation wrapper for a primality testing function"""
+    def __init__(self, owner: str, methods: Iterable):
         self.calls = 0
         self.uncertain = 0
         self.prime = 0
         self.notprime = 0
         self._owner = owner
-        self._stats = {}
-        for function in methods:
-            self._stats[function.__name__] = MethodStats()
+        self._stats = {func.__name__: MethodStats() for func in methods}
 
     def display(self):
+        """Prints the instrumentation statistics to the console."""
         print(str(self))
 
-    def __str__(self):
-        template = (
-                'Instrumentation for %s\n'
-                '  - definitely not prime:  %d\n'
-                '  - definitely prime:      %d\n'
-                '  - probably prime:        %d\n'
-                '  - total:                 %d\n'
-                '%s\n'
-            )
+    def __str__(self) -> str:
+        """Returns a string representation of the statistics."""
         items = sorted(self._stats.items())
-        items = ['%s: %s' % item for item in items if item[1].hits != 0]
-        items = '\n'.join(items)
-        args = (self._owner, self.notprime, self.prime, self.uncertain, self.calls, items)
-        return template % args
+        items_str = '\n'.join(
+            f'  - {name}: {stats}' for name, stats in items if stats.hits > 0
+        )
+        return (
+            f'Instrumentation for {self._owner}\n'
+            f'  - Total calls:           {self.calls}\n'
+            f'  - Definitely not prime:  {self.notprime}\n'
+            f'  - Definitely prime:      {self.prime}\n'
+            f'  - Probably prime:        {self.uncertain}\n'
+            f'Method Hits:\n{items_str}\n'
+        )
 
-    def update(self, name, n, flag):
-        assert flag in (0, 1, 2)
+    def update(self, name: str, n: int, flag: int):
+        """
+        Update stats for a given method.
+        Flag: 0 = not prime, 1 = prime, 2 = uncertain.
+        """
+        if name not in self._stats:
+            raise ValueError(f"Method '{name}' not registered for instrumentation.")
+
         self._stats[name].update(n)
         self.calls += 1
         if flag == 0:
             self.notprime += 1
         elif flag == 1:
             self.prime += 1
-        else:
+        else: # flag == 2
             self.uncertain += 1
